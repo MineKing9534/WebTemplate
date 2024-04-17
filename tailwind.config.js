@@ -11,7 +11,7 @@ export default {
 		extend: {
 			colors: {
 				primary: "#007bff",
-				danger: "#ff0202",
+				danger: "#ff0202"
 			}
 		}
 	},
