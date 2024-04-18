@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useLocalStorage } from "usehooks-ts";
 
 export function useDarkMode() {
-	const [ state, setState ] = useState(true)
+	const [ darkMode, setDarkMode ] = useLocalStorage<boolean>("darkmode", true)
 
 	return {
-		darkMode: state,
-		setDarkMode: (state: boolean) => setState(state),
+		darkMode: darkMode,
+		setDarkMode: (state: boolean) => setDarkMode(state),
 	}
 }
