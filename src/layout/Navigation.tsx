@@ -14,7 +14,7 @@ export default function Navigation() {
 	}, [ darkMode ])
 
 	return (
-		<Navbar maxWidth="full" height="45px" isBordered>
+		<Navbar maxWidth="full" height="50px" isBordered>
 			<NavbarBrand>
 				<Link className="gap-2" color="foreground" href="/">
 					<img src={ icon }/>
