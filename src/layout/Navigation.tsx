@@ -22,7 +22,7 @@ export default function Navigation() {
 				</Link>
 			</NavbarBrand>
 
-			<NavbarContent className="hidden sm:flex gap-4" justify="center">
+			<NavbarContent className="hidden sm:flex gap-7" justify="center">
 				<NavEntry path="/">Home</NavEntry>
 				<NavEntry path="/test">Test</NavEntry>
 				<NavEntry path="/abc">Abc</NavEntry>
