@@ -12,6 +12,10 @@ export default {
 			colors: {
 				primary: "#007bff",
 				danger: "#ff0202"
+			},
+			screens: {
+				"h-md": { "raw": "(height >= 650px)" },
+				"h-lg": { "raw": "(height >= 800px)" }
 			}
 		}
 	},

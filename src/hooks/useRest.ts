@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ErrorResponse } from "./ErrorResponse.ts";
+import { useEffect, useRef, useState } from "react";
+import { ErrorResponse } from "../types/ErrorResponse.ts";
 import { useToken } from "./useToken.ts";
 
 export type RequestState = "success" | "error" | "idle" | "loading"
 
-export interface Request {
+export interface Request<T> {
 	path?: string
 	data?: object
+	onSuccess?: (data: T) => void
+	onError?: (error: ErrorResponse) => void
 }
 
 export interface RestRoute<T> {
@@ -14,13 +16,15 @@ export interface RestRoute<T> {
 	data?: T
 	error?: ErrorResponse
 
-	get: (data?: Request) => void
-	post: (data?: Request) => void
-	put: (data?: Request) => void
-	delete: (data?: Request) => void
+	get: (data?: Request<T>) => void
+	post: (data?: Request<T>) => void
+	put: (data?: Request<T>) => void
+	patch: (data?: Request<T>) => void
+	delete: (data?: Request<T>) => void
 
 	reset: () => void
 	cancel: () => void
+	set: (data?: T, error?: ErrorResponse) => void
 }
 
 
@@ -48,16 +52,22 @@ function anySignal(signals: AbortSignal[]) {
 }
 
 export function useRest<T>(route: string, {
-	parser = res => res.json(),
+	parser = res => res.text().then(t => t && JSON.parse(t)),
 	auto = false,
 	cache = true,
-	timeout = 10
+	timeout = 10,
+	delay = 0,
+	onError,
+	onSuccess
 }: {
 	parser?: (res: Response) => Promise<T>
 	auto?: boolean,
 	cache?: boolean,
-	timeout?: number
-}): RestRoute<T> {
+	timeout?: number,
+	delay?: number,
+	onError?: (error: ErrorResponse) => void,
+	onSuccess?: (data: T) => void
+} = {}): RestRoute<T> {
 	const abort = useRef<AbortController>()
 	const { token } = useToken()
 
@@ -65,7 +75,7 @@ export function useRest<T>(route: string, {
 	const [ data, setData ] = useState<T | undefined>(undefined)
 	const [ error, setError ] = useState<ErrorResponse | undefined>(undefined)
 
-	const execute = useCallback((method: string, request: Request) => {
+	function execute(method: string, request: Request<T>) {
 		const controller = new AbortController()
 		abort.current = controller
 
@@ -78,10 +88,10 @@ export function useRest<T>(route: string, {
 			setError(undefined)
 		}
 
-		fetch(`${ import.meta.env._API }${ route }${ request.path || "" }`, {
+		setTimeout(() => fetch(`${ import.meta.env._API }${ route }${ request.path || "" }`, {
 			signal: signal,
 			method: method,
-			body: data && JSON.stringify(data),
+			body: request.data && JSON.stringify(request.data),
 			headers: {
 				Authorization: token || ""
 			}
@@ -91,26 +101,38 @@ export function useRest<T>(route: string, {
 					setState("success")
 					setError(undefined)
 					setData(data)
+
+					if(onSuccess) onSuccess(data)
+					if(request.onSuccess) request.onSuccess(data)
 				})
 			} else {
 				res.json().then(data => {
 					setState("error")
-					setError((data as { type: ErrorResponse }).type)
+					setError(data as ErrorResponse)
 					setData(undefined)
+
+					if(onError) onError(data)
+					if(request.onError) request.onError(data)
 				})
 			}
 		}).catch(() => {
+
+
 			if(signal.reason === "Cancel") setState("idle")
 			else {
 				setState("error")
-				setError("TIMEOUT")
+
+				const error = { status: 0, type: "TIMEOUT" } as ErrorResponse
+				setError(error)
+				if(onError) onError(error)
+				if(request.onError) request.onError(error)
 			}
-		})
-	}, [ cache, parser, route, timeout, token ])
+		}), delay * 1000)
+	}
 
 	useEffect(() => {
 		if(auto) execute("GET", {})
-	}, [ auto, execute, token ])
+	}, [ auto, token ])
 
 	function reset() {
 		setState(auto ? "loading" : "idle")
@@ -125,12 +147,28 @@ export function useRest<T>(route: string, {
 		data: data,
 		error: error,
 
-		get: (request: Request = {}) => execute("GET", request),
-		put: (request: Request = {}) => execute("PUT", request),
-		post: (request: Request = {}) => execute("POST", request),
-		delete: (request: Request = {}) => execute("DELETE", request),
+		get: (request: Request<T> = {}) => execute("GET", request),
+		post: (request: Request<T> = {}) => execute("POST", request),
+		put: (request: Request<T> = {}) => execute("PUT", request),
+		patch: (request: Request<T> = {}) => execute("PATCH", request),
+		delete: (request: Request<T> = {}) => execute("DELETE", request),
 
 		reset: reset,
-		cancel: () => abort.current?.abort("Cancel")
+		cancel: () => abort.current?.abort("Cancel"),
+		set: (data, error) => {
+			if(data) {
+				setData(data)
+				setError(undefined)
+				setState("success")
+			} else if(error) {
+				setData(undefined)
+				setError(error)
+				setState("error")
+			} else {
+				setData(undefined)
+				setError(undefined)
+				setState("idle")
+			}
+		}
 	}
 }
